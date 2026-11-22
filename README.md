@@ -1,6 +1,6 @@
 # CI/CD Tools and Practices Final Project
 
-![Build Status](https://github.com/YOUR_GITHUB_USERNAME/ci-cd-final-project/actions/workflows/workflow.yml/badge.svg)
+![Build Status](https://github.com/KaramDevX/courserarepo/actions/workflows/workflow.yml/badge.svg)
 
 **Project name:** ci-cd-final-project — a Flask Counter service with a CI/CD pipeline (GitHub Actions + Tekton + OpenShift).
 
