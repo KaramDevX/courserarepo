@@ -1,0 +1,90 @@
+# Optional shortcut: instead of building the pipeline by clicking in the
+# OpenShift console, apply this with `oc apply -f .tekton/pipeline.yml`.
+# Before applying, install the flake8 task:  tkn hub install task flake8
+apiVersion: tekton.dev/v1beta1
+kind: Pipeline
+metadata:
+  name: ci-cd-pipeline
+spec:
+  params:
+    - name: GIT_REPO
+      type: string
+      description: URL of your ci-cd-final-project repo
+    - name: GIT_REF
+      type: string
+      default: main
+    - name: APP_NAME
+      type: string
+      default: cicd-app
+    - name: IMAGE
+      type: string
+      description: e.g. image-registry.openshift-image-registry.svc:5000/<your-namespace>/cicd-app:latest
+  workspaces:
+    - name: output
+  tasks:
+    - name: cleanup
+      taskRef:
+        name: cleanup
+      workspaces:
+        - name: source
+          workspace: output
+
+    - name: git-clone
+      runAfter: [cleanup]
+      taskRef:
+        kind: ClusterTask
+        name: git-clone
+      params:
+        - name: url
+          value: $(params.GIT_REPO)
+        - name: revision
+          value: $(params.GIT_REF)
+      workspaces:
+        - name: output
+          workspace: output
+
+    - name: flake8
+      runAfter: [git-clone]
+      taskRef:
+        name: flake8
+      params:
+        - name: image
+          value: python:3.9-slim
+        - name: args
+          value: ["--count", "--max-complexity=10", "--max-line-length=127", "--statistics"]
+      workspaces:
+        - name: source
+          workspace: output
+
+    - name: nose
+      runAfter: [flake8]
+      taskRef:
+        name: nose
+      params:
+        - name: args
+          value: "-v --with-spec --spec-color"
+      workspaces:
+        - name: source
+          workspace: output
+
+    - name: buildah
+      runAfter: [nose]
+      taskRef:
+        kind: ClusterTask
+        name: buildah
+      params:
+        - name: IMAGE
+          value: $(params.IMAGE)
+      workspaces:
+        - name: source
+          workspace: output
+
+    - name: deploy
+      runAfter: [buildah]
+      taskRef:
+        kind: ClusterTask
+        name: openshift-client
+      params:
+        - name: SCRIPT
+          value: |
+            oc create deployment $(params.APP_NAME) --image=$(params.IMAGE) --dry-run=client -o yaml | oc apply -f -
